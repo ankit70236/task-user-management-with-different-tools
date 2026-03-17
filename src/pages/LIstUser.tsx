@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../component/toast";
 
 
 type User = {
@@ -17,7 +18,7 @@ export default function ListUser() {
 
  useEffect(() => {
     async function getUsers() {
-      const res = await fetch("http://localhost:8082/api/v1/users", {
+      const res = await fetch("/api/v1/users", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -37,7 +38,7 @@ export default function ListUser() {
 
   const token = localStorage.getItem("token");
 
-  const response = await fetch(`http://localhost:8082/api/v1/users/${id}`, {
+  const response = await fetch(`/api/v1/users/${id}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -50,6 +51,7 @@ export default function ListUser() {
 
   if(response.ok){
     setUsers(users.filter((user)=> user.id !== id))
+    showToast("user deleted!", "success");
   }
 }
 console.log(localStorage.getItem("token"))

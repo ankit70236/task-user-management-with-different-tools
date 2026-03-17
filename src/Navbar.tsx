@@ -1,5 +1,6 @@
 
 import { Link } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
 
 function Navbar() {
   return (
@@ -12,7 +13,18 @@ function Navbar() {
           <Link to="/login" className="hover:text-blue-400">Login</Link>
           <Link to="/register" className="hover:text-blue-400">Register</Link>
           <Link to="/profile" className="hover:text-blue-400 text-sm">Profile</Link>
+           <ToastContainer
+        position="top-right"
+        autoClose={2000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="colored"
+      />
         </div>
+       
       </div>
     </nav>
   );

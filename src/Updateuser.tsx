@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { showToast } from "./component/toast";
 
 function UpdateUser() {
 
@@ -37,7 +38,7 @@ function UpdateUser() {
 
     const token = localStorage.getItem("token");
 
-    const response = await fetch(`http://localhost:8082/api/v1/users/${id}`,{
+    const response = await fetch(`/api/v1/users/${id}`,{
       method:"PUT",
       headers:{
         "Content-Type":"application/json",
@@ -52,10 +53,11 @@ function UpdateUser() {
     const data = await response.json();
 
     if(response.ok){
-      alert("User Updated Successfully");
+      showToast("user updated!", "success");
       navigate("/");
     }else{
-      alert(data.error?.message || "Update Failed");
+      alert(data.error?.message);
+      showToast("Update Failed!", "error");
     }
   };
 

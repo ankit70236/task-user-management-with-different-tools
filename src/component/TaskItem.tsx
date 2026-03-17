@@ -1,3 +1,5 @@
+import { showToast } from "./toast";
+
 interface TaskItemProps {
   task: {
     id: string;
@@ -17,13 +19,13 @@ const TaskItem = ({ task, fetchTasks, setEditTask, setShowForm }: TaskItemProps)
   const deleteTask = async () => {
 
     if (!token) {
-      alert("Please login first");
+      showToast("Please login first","error")
       return;
     }
 
     try {
 
-      const res = await fetch(`http://localhost:8082/api/v1/tasks/${task.id}`, {
+      const res = await fetch(`/api/v1/tasks/${task.id}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -31,8 +33,10 @@ const TaskItem = ({ task, fetchTasks, setEditTask, setShowForm }: TaskItemProps)
       });
 
       if (!res.ok) {
-        alert("Delete failed");
+        showToast("delete failed!", "error")
         return;
+      }else{
+        showToast("Task deleted!", "success")
       }
 
       fetchTasks();

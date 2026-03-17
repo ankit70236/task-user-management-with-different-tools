@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../component/toast";
+
 
 function Login() {
 
@@ -11,7 +13,7 @@ function Login() {
 
     e.preventDefault();
 
-    fetch("http://localhost:8082/api/v1/login", {
+    fetch("/api/v1/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -32,16 +34,16 @@ function Login() {
 
           // ✅ token save
           localStorage.setItem("token", data.data.token);
-
+          showToast("Login successfully!", "success");
           // ✅ userId save
           localStorage.setItem("userId", data.data.user.id);
-
+           
           // redirect
           navigate("/home");
 
         } else {
 
-          alert("Invalid email or password");
+          showToast("Login unsuccessful!", "error");
 
         }
 

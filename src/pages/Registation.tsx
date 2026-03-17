@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../component/toast";
 
 function Register() {
   const [email, setEmail] = useState("");
@@ -9,7 +10,7 @@ function Register() {
 
   const handleRegister = (e: React.FormEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    fetch("http://localhost:8082/api/v1/users", {
+    fetch("/api/v1/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name: fullname }),
@@ -17,13 +18,13 @@ function Register() {
       .then(async res => {
         const data = await res.json();
         if (res.ok) {
-          alert("Registration successful!");
+          showToast("Registration successfully!", "success");
           navigate("/login");
         } else {
-          alert(data.message || "Registration failed!");
+          showToast("Registration failed!", "error");
         }
       })
-      .catch(() => alert("Network error"));
+      .catch(() => showToast("Network error", "error"));
   };
 
   return (

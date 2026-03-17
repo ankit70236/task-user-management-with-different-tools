@@ -35,7 +35,7 @@ export default function Profile() {
     console.log("Decoded JWT:", decoded);
     const userId = decoded.sub || decoded.id || decoded.userId;
 
-    fetch(`http://localhost:8082/api/v1/users/${userId}`, {
+    fetch(`/api/v1/users/${userId}`, {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
@@ -59,7 +59,7 @@ export default function Profile() {
 
     if (!user) return;
 
-    const res = await fetch(`http://localhost:8082/api/v1/users/${user.id}`, {
+    const res = await fetch(`/api/v1/users/${user.id}`, {
       method: "DELETE",
       headers: {
         "Authorization": `Bearer ${token}`
