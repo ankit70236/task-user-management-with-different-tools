@@ -3,7 +3,7 @@ import Navbar from "./Navbar";
 import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
 import Register from "./pages/Registation";
-import UpdateUser from "./Updateuser";
+import UpdateUser from "./pages/Updateuser";
 import Profile from "./pages/Profile";
 import Footer from "./Footer";
 import ListUser from "./pages/LIstUser";

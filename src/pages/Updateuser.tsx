@@ -17,17 +17,19 @@ export default function UpdateUser() {
 
   useEffect(() => {
     const fetchUser = async () => {
+      console.log('inside fetch user')
       try {
         const res = await apiFetch(`/users/${id}`)
-        const data = await res.json()
+         console.log("hello world data" ,res)
+        const user = res?.data
+        console.log("user data world" ,user)
 
-        const user = data?.data
-
+        console.log("hello world" ,user)
         if (!user) {
           showToast("User not found", "error")
           return
         }
-
+          console.log("hello world" ,user)
         // ✅ old data auto fill
         reset({
           name: user?.name || "",
@@ -40,6 +42,7 @@ export default function UpdateUser() {
       }
     }
 
+    console.log('calling from useEffect')
     fetchUser()
   }, [id, reset])
 
