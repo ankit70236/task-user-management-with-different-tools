@@ -5,7 +5,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Registation";
 import UpdateUser from "./Updateuser";
 import Profile from "./pages/Profile";
-import ListUser from "./pages/ListUser";
+import Footer from "./Footer";
+import ListUser from "./pages/LIstUser";
 
 export default function App() {
 
@@ -27,6 +28,7 @@ export default function App() {
         {/* Redirect any unknown route to home */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      <Footer></Footer>
     </div>
   );
 }
