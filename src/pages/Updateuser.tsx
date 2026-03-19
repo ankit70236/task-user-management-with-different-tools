@@ -1,118 +1,101 @@
 import { useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { showToast } from "../component/toast"
+import { apiFetch } from "../utils/api"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { apiFetch } from "@/utils/api"
+type FormData = {
+  name: string
+  email: string
+}
 
-// ✅ Schema
-const updateUserSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .regex(/@gmail\.com$/, "Email must end with @gmail.com"),
-})
-
-type UpdateUserFormData = z.infer<typeof updateUserSchema>
-
-function UpdateUser() {
+export default function UpdateUser() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<UpdateUserFormData>({
-    resolver: zodResolver(updateUserSchema),
-    mode: "onBlur",
-  })
+  const { register, handleSubmit, reset } = useForm<FormData>()
 
-  // ✅ Fetch user data
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const data = await apiFetch(`/users/${id}`)
+        const res = await apiFetch(`/users/${id}`)
+        const data = await res.json()
 
-        // API के हिसाब से adjust करो
-        const user = data.data || data
+        const user = data?.data
 
-        setValue("name", user.name)
-        setValue("email", user.email)
+        if (!user) {
+          showToast("User not found", "error")
+          return
+        }
 
-      } catch (err: any) {
-        showToast(err.message || "Failed to load user", "error")
-        navigate("/login")
+        // ✅ old data auto fill
+        reset({
+          name: user?.name || "",
+          email: user?.email || "",
+        })
+
+      } catch (err) {
+        console.error(err)
+        showToast("Error fetching user", "error")
       }
     }
 
     fetchUser()
-  }, [id, setValue])
+  }, [id, reset])
 
-  // ✅ Submit
-  const onSubmit = async (formData: UpdateUserFormData) => {
+  const onSubmit = async (formData: FormData) => {
     try {
-      await apiFetch(`/users/${id}`, {
+      const res = await apiFetch(`/users/${id}`, {
         method: "PUT",
         body: JSON.stringify(formData),
       })
 
-      showToast("User updated successfully!", "success")
-      navigate("/profile")
-
-    } catch (err: any) {
-      showToast(err.message || "Update failed!", "error")
+      if (res.ok) {
+        showToast("User updated successfully", "success")
+        navigate("/")
+      } else {
+        showToast("Update failed", "error")
+      }
+    } catch (err) {
+      console.error(err)
+      showToast("Something went wrong", "error")
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-xl space-y-6">
+    <div className="max-w-md mx-auto mt-10 p-6 border rounded-xl shadow">
+      <h2 className="text-xl font-semibold mb-6 text-center">Update User</h2>
 
-        <h2 className="text-2xl font-bold text-center">Update User</h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Name Field */}
+        <div>
+          <label className="block mb-1 font-medium">Name</label>
+          <input
+            {...register("name")}
+            className="w-full border px-3 py-2 rounded"
+            placeholder="Enter name"
+          />
+        </div>
 
-          {/* Name */}
-          <div className="space-y-1">
-            <Label>Name</Label>
-            <Input
-              type="text"
-              placeholder="Enter your name"
-              {...register("name")}
-            />
-          </div>
+        {/* Email Field */}
+        <div>
+          <label className="block mb-1 font-medium">Email</label>
+          <input
+            {...register("email")}
+            className="w-full border px-3 py-2 rounded"
+            placeholder="Enter email"
+          />
+        </div>
 
-          {/* Email */}
-          <div className="space-y-1">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              {...register("email")}
-            />
-          </div>
+        <button
+          type="submit"
+          className="w-full bg-black text-white py-2 rounded hover:opacity-90"
+        >
+          Update
+        </button>
 
-          {/* Button */}
-          <Button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            Update User
-          </Button>
-
-        </form>
-
-      </div>
+      </form>
     </div>
   )
 }
-
-export default UpdateUser

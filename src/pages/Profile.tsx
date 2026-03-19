@@ -1,5 +1,8 @@
+import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../component/toast";
 
 type User = {
   id: string;
@@ -8,70 +11,64 @@ type User = {
 };
 
 export default function Profile() {
-
   const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  // JWT decode
   function parseJwt(token: string) {
     try {
-      const base64 = token.split(".")[1];
-      const decoded = atob(base64);
-      return JSON.parse(decoded);
+      return JSON.parse(atob(token.split(".")[1]));
     } catch {
       return null;
     }
   }
 
   useEffect(() => {
-
     if (!token) {
       navigate("/login");
       return;
     }
 
     const decoded = parseJwt(token);
-    console.log("Decoded JWT:", decoded);
-    const userId = decoded.sub || decoded.id || decoded.userId;
+    const userId = decoded?.sub || decoded?.id || decoded?.userId;
 
-    fetch(`/api/v1/users/${userId}`, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-          if(data.error){
-            alert(data.error.message);
-            navigate("/login");
-            return;
-          }
-          setUser(data.data || data);
-        })
-      .catch(err => console.log(err));
-
-  }, [token]);
-
-  // DELETE USER
-  const deleteAccount = async () => {
-
-    if (!user) return;
-
-    const res = await fetch(`/api/v1/users/${user.id}`, {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    });
-
-    if (res.ok) {
-      alert("Account deleted");
-      localStorage.removeItem("token");
-      navigate("/register");
+    if (!userId) {
+      navigate("/login");
+      return;
     }
 
+    apiFetch(`/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((data) => {
+        const userData = data?.data || data;
+        setUser(userData);
+      })
+      .catch((err) => {
+        showToast(err.message || "Failed to load user", "error");
+        navigate("/login");
+      });
+  }, [token, navigate]);
+
+  const deleteAccount = async () => {
+    if (!user) return;
+
+    try {
+      await apiFetch(`/users/${user.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      showToast("Account deleted", "success");
+      localStorage.removeItem("token");
+      navigate("/register");
+    } catch (err: any) {
+      showToast(err.message || "Delete failed", "error");
+    }
   };
 
   if (!user) {
@@ -80,47 +77,31 @@ export default function Profile() {
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
-
       <div className="bg-white w-96 p-8 rounded-2xl shadow-xl">
-
-        <h2 className="text-3xl font-bold text-center mb-6">
-          My Profile
-        </h2>
+        <h2 className="text-3xl font-bold text-center mb-6">My Profile</h2>
 
         <div className="space-y-4">
-
           <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-500">Name</p>
-            <p className="text-lg font-semibold">{user.name}</p>
+            <p>Name</p>
+            <p className="font-semibold">{user?.name || "No Name"}</p>
           </div>
 
           <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-500">Email</p>
-            <p className="text-lg font-semibold">{user.email}</p>
+            <p>Email</p>
+            <p className="font-semibold">{user?.email || "No Email"}</p>
           </div>
-
         </div>
 
         <div className="flex gap-4 mt-6">
+          <Button onClick={() => navigate(`/updateuser/${user.id}`)}>
+            Edit
+          </Button>
 
-          <button
-            onClick={() => navigate(`/updateuser/${user.id}`)}
-            className="w-full bg-blue-500 text-white py-2 rounded-lg"
-          >
-            Edit Profile
-          </button>
-
-          <button
-            onClick={deleteAccount}
-            className="w-full bg-red-500 text-white py-2 rounded-lg"
-          >
-            Delete Account
-          </button>
-
+          <Button variant="destructive" onClick={deleteAccount}>
+            Delete
+          </Button>
         </div>
-
       </div>
-
     </div>
   );
 }

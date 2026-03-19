@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { showToast } from "../component/toast";
-
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { apiFetch } from "@/utils/api";
 
 type User = {
   id: string;
@@ -9,102 +16,114 @@ type User = {
   name: string;
 };
 
-
 export default function ListUser() {
-
   const [users, setUsers] = useState<User[]>([]);
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
 
- useEffect(() => {
-    async function getUsers() {
-      const res = await fetch("/api/v1/users", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        }
-      });
+  const parseJwt = (token: string) => {
+    try {
+      return JSON.parse(atob(token.split(".")[1]));
+    } catch {
+      return null;
+    }
+  };
 
-      const data = await res.json();
-      // console.log(data.data);
-      setUsers(data.data || []);
+  const loggedUser = token ? parseJwt(token) : null;
+  const loggedUserId = loggedUser?.sub;
+
+  useEffect(() => {
+    async function getUsers() {
+      try {
+        const data = await apiFetch("/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const usersData = Array.isArray(data)
+          ? data
+          : data?.data || [];
+
+        setUsers(usersData);
+      } catch (err: any) {
+        showToast(err.message || "Failed to load users", "error");
+      }
+    }
+
+    if (!token) {
+      navigate("/login");
+      return;
     }
 
     getUsers();
-  }, [token]);
+  }, [token, navigate]);
 
   const deleteUser = async (id: string) => {
+    try {
+      await apiFetch(`/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  const token = localStorage.getItem("token");
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      showToast("User deleted!", "success");
 
-  const response = await fetch(`/api/v1/users/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
+      if (id === loggedUserId) {
+        localStorage.removeItem("token");
+        navigate("/register");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Delete failed!", "error");
     }
-  });
-
-  const data = await response.json();
-  console.log(data);
-
-  if(response.ok){
-    setUsers(users.filter((user)=> user.id !== id))
-    showToast("user deleted!", "success");
-  }
-}
-console.log(localStorage.getItem("token"))
-
+  };
 
   return (
-      <div className="p-10">
+    <div className="p-10">
+      <h1 className="text-3xl font-bold mb-6">List of Users</h1>
 
-      <h1 className="text-3xl font-bold mb-6">
-        List of Users
-      </h1>
-
-      <div className="grid gap-4">
-
+      <div className="grid gap-5">
         {users.map((user) => (
+          <Card key={user.id}>
+            <CardHeader>
+              <CardTitle>{user?.name || "No Name"}</CardTitle>
+            </CardHeader>
 
-          <div
-            key={user.id}
-            className="border p-4 rounded-lg shadow flex justify-between items-center"
-          >
+            <CardContent>
+              <p>{user?.email || "No Email"}</p>
 
-            <div>
-              <p className="font-semibold">Name : {user.name}</p>
-              <p className="text-gray-500">Email : {user.email}</p>
-            </div>
+              <div className="flex gap-4 mt-3">
+                <Button
+                  onClick={() => {
+                    if (user.id !== loggedUserId) {
+                      showToast("You can update only your account!", "error");
+                      return;
+                    }
+                    navigate(`/updateuser/${user.id}`);
+                  }}
+                >
+                  Update
+                </Button>
 
-            <div className="space-x-3">
-
-              <button
-                onClick={()=>navigate(`/updateuser/${user.id}`)}
-
-                className="bg-blue-500 text-white px-4 py-1 rounded"
-              >
-                Update
-              </button>
-
-              <button
-                onClick={() => deleteUser(user.id)}
-                className="bg-red-500 text-white px-4 py-1 rounded"
-              >
-                Delete
-              </button>
-
-            </div>
-
-          </div>
-
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (user.id !== loggedUserId) {
+                      showToast("You can delete only your account!", "error");
+                      return;
+                    }
+                    deleteUser(user.id);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ))}
-
       </div>
-
     </div>
   );
 }
-
-

@@ -1,4 +1,12 @@
 import { showToast } from "./toast";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { apiFetch } from "../utils/api";
 
 interface TaskItemProps {
   task: {
@@ -12,90 +20,92 @@ interface TaskItemProps {
   setShowForm: (show: boolean) => void;
 }
 
-const TaskItem = ({ task, fetchTasks, setEditTask, setShowForm }: TaskItemProps) => {
-
+const TaskItem = ({
+  task,
+  fetchTasks,
+  setEditTask,
+  setShowForm,
+}: TaskItemProps) => {
   const token = localStorage.getItem("token");
 
   const deleteTask = async () => {
-
     if (!token) {
-      showToast("Please login first","error")
+      showToast("Please login first", "error");
       return;
     }
 
     try {
+      console.log("Deleting task ID:", task.id); // ✅ debug
 
-      const res = await fetch(`/api/v1/tasks/${task.id}`, {
+      const res = await apiFetch(`/tasks/${task.id}`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      if (!res.ok) {
-        showToast("delete failed!", "error")
-        return;
-      }else{
-        showToast("Task deleted!", "success")
-      }
+      console.log("Delete response:", res); // ✅ debug
 
+      showToast("Task deleted successfully!", "success");
       fetchTasks();
+    } catch (err: any) {
+      console.error("DELETE ERROR:", err.message);
 
-    } catch (err) {
-      console.error(err);
+      showToast(err.message || "Delete failed!", "error");
     }
-
   };
 
   const handleEdit = () => {
+    if (!token) {
+      showToast("Please login first", "error");
+      return;
+    }
+
     setEditTask(task);
     setShowForm(true);
   };
 
   return (
+    <Card className="mb-4 shadow-sm hover:shadow-md transition-all">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">
+          {task.title}
+        </CardTitle>
+      </CardHeader>
 
-    <div style={{
-      border: "1px solid #ddd",
-      padding: "15px",
-      marginBottom: "10px",
-      borderRadius: "5px",
-      background: "#fafafa"
-    }}>
+      <CardContent className="space-y-3">
+        <p className="text-gray-600 text-sm">{task.description}</p>
 
-      <h3>{task.title}</h3>
-      <p>{task.description}</p>
-      <p>Status: <b>{task.status}</b></p>
+        <p className="text-sm">
+          Status:{" "}
+          <span
+            className={`px-2 py-1 text-xs rounded-full font-medium ${
+              task.status === "completed"
+                ? "bg-green-100 text-green-700"
+                : task.status === "in_progress"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-yellow-100 text-yellow-700"
+            }`}
+          >
+            {task.status || "pending"}
+          </span>
+        </p>
 
-      <button
-        onClick={handleEdit}
-        style={{
-          marginRight: "10px",
-          backgroundColor: "#ffc107",
-          border: "none",
-          padding: "6px 12px",
-          cursor: "pointer"
-        }}
-      >
-        Edit
-      </button>
+        <div className="flex gap-2 pt-2">
+          <Button
+            onClick={handleEdit}
+            className="bg-yellow-500 hover:bg-yellow-600"
+          >
+            Edit
+          </Button>
 
-      <button
-        onClick={deleteTask}
-        style={{
-          backgroundColor: "#dc3545",
-          color: "white",
-          border: "none",
-          padding: "6px 12px",
-          cursor: "pointer"
-        }}
-      >
-        Delete
-      </button>
-
-    </div>
-
+          <Button onClick={deleteTask} variant="destructive">
+            Delete
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
-
 };
 
 export default TaskItem;
