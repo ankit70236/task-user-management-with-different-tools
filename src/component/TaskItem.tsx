@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { showToast } from "./toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,52 +7,53 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { apiFetch } from "../utils/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useDeleteTaskMutation } from "../features/task/taskApi";
 
 interface TaskItemProps {
   task: {
     id: string;
     title: string;
-    description: string;
-    status?: string;
+    description?: string;
+      status?: string;
   };
-  fetchTasks: () => void;
-  setEditTask: (task: any) => void;
+  setEditTask: (task: TaskItemProps["task"]) => void;
   setShowForm: (show: boolean) => void;
 }
 
 const TaskItem = ({
   task,
-  fetchTasks,
   setEditTask,
   setShowForm,
 }: TaskItemProps) => {
   const token = localStorage.getItem("token");
+  const [deleteTaskMutation, { isLoading: isDeleting }] =
+    useDeleteTaskMutation();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const deleteTask = async () => {
+  const requestDelete = () => {
     if (!token) {
       showToast("Please login first", "error");
       return;
     }
+    setConfirmOpen(true);
+  };
 
+  const confirmDelete = async () => {
     try {
-      console.log("Deleting task ID:", task.id); // ✅ debug
-
-      const res = await apiFetch(`/tasks/${task.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log("Delete response:", res); // ✅ debug
-
+      await deleteTaskMutation(task.id).unwrap();
       showToast("Task deleted successfully!", "success");
-      fetchTasks();
-    } catch (err: any) {
-      console.error("DELETE ERROR:", err.message);
-
-      showToast(err.message || "Delete failed!", "error");
+      setConfirmOpen(false);
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
+      showToast(e?.data?.message || e?.message || "Delete failed!", "error");
     }
   };
 
@@ -80,7 +82,7 @@ const TaskItem = ({
           Status:{" "}
           <span
             className={`px-2 py-1 text-xs rounded-full font-medium ${
-              task.status === "completed"
+              task.status === "done" || task.status === "completed"
                 ? "bg-green-100 text-green-700"
                 : task.status === "in_progress"
                 ? "bg-blue-100 text-blue-700"
@@ -99,11 +101,40 @@ const TaskItem = ({
             Edit
           </Button>
 
-          <Button onClick={deleteTask} variant="destructive">
+          <Button onClick={requestDelete} variant="destructive">
             Delete
           </Button>
         </div>
       </CardContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete &ldquo;{task.title}&rdquo;. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => void confirmDelete()}
+            >
+              {isDeleting ? "Deleting…" : "OK"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -1,22 +1,10 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// services/api.ts
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithErrorMessage } from "./baseApi";
 
-export const apiFetch = async (url: string, options: any = {}) => {
-  console.log('making api call on the url ', url)
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${BASE_URL}${url}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    ...options,
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data?.message || "API Error");
-  }
-  console.log('data from api', data)
-  return data;
-};
+export const api = createApi({
+  reducerPath: "api",
+  baseQuery: baseQueryWithErrorMessage,
+  tagTypes: ["User", "Task"],
+  endpoints: () => ({}),
+});

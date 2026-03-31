@@ -5,10 +5,11 @@ import { showToast } from "../component/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { apiFetch } from "@/utils/api"
+import { useLoginMutation } from "../features/auth/authApi";
 
 function Login() {
   const navigate = useNavigate()
+  const [login, { isLoading }] = useLoginMutation()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
@@ -26,27 +27,29 @@ function Login() {
     }
 
     try {
-      const data = await apiFetch("/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (data?.data) {
-        localStorage.setItem("token", data.data.token)
-        localStorage.setItem("userId", data.data.user.id)
+      const res = await login({ email, password }).unwrap()
+      console.log(res)
+    
+      if (!res?.data) {
+        showToast("Login failed", "error")
+        return
+      }
+    
+      const { token, user } = res.data
+    
+      if (token && user) {
+        localStorage.setItem("token", token)
+        localStorage.setItem("userId", user.id)
+    
         showToast("Login successfully!", "success")
         navigate("/home")
-      } else if (data.message?.toLowerCase().includes("password")) {
-        showToast("Incorrect password!", "error")
-      } else if (data.message?.toLowerCase().includes("email")) {
-        showToast("Email not found!", "error")
       } else {
-        showToast("Login unsuccessful!", "error")
+        showToast("Invalid response from server", "error")
       }
+    
     } catch (err) {
       console.error(err)
-      showToast("Something went wrong!", "error")
+      showToast("Invalid email or password", "error")
     }
   }
 
@@ -79,7 +82,7 @@ function Login() {
           </div>
 
           <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-            Login
+            {isLoading ? "Logging in..." : "Login"}
           </Button>
 
         </form>

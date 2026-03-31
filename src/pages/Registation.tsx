@@ -7,9 +7,8 @@ import { showToast } from "../component/toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { apiFetch } from "@/utils/api"
+import { useRegisterUserMutation } from "../features/auth/authApi"
 
-// ✅ Schema
 const registerSchema = z.object({
   fullname: z.string().min(1, "Full Name is required"),
   email: z
@@ -23,6 +22,7 @@ type RegisterFormData = z.infer<typeof registerSchema>
 
 export default function Register() {
   const navigate = useNavigate()
+  const [registerUser, { isLoading }] = useRegisterUserMutation()
 
   const {
     register,
@@ -34,26 +34,23 @@ export default function Register() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await apiFetch("/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          name: data.fullname,
-        }),
-      })
+      await registerUser({
+        email: data.email,
+        password: data.password,
+        name: data.fullname,
+      }).unwrap()
 
       showToast("Registration successful!", "success")
       navigate("/login")
 
-    } catch (err: any) {
-      const message = err?.message?.toLowerCase() || ""
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string }
+      const message = (e?.data?.message || e?.message || "").toLowerCase()
 
       if (message.includes("exist")) {
         showToast("Email already registered!", "error")
       } else {
-        showToast(err.message || "Registration failed!", "error")
+        showToast(e?.data?.message || e?.message || "Registration failed!", "error")
       }
     }
   }
@@ -66,7 +63,6 @@ export default function Register() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-          {/* Full Name */}
           <div className="space-y-1">
             <Label>Full Name</Label>
             <Input
@@ -79,7 +75,6 @@ export default function Register() {
             )}
           </div>
 
-          {/* Email */}
           <div className="space-y-1">
             <Label>Email</Label>
             <Input
@@ -92,7 +87,6 @@ export default function Register() {
             )}
           </div>
 
-          {/* Password */}
           <div className="space-y-1">
             <Label>Password</Label>
             <Input
@@ -105,13 +99,12 @@ export default function Register() {
             )}
           </div>
 
-          {/* Button */}
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
             className="w-full bg-green-600 hover:bg-green-700"
           >
-            {isSubmitting ? "Registering..." : "Register"}
+            {isSubmitting || isLoading ? "Registering..." : "Register"}
           </Button>
 
         </form>

@@ -15,7 +15,7 @@ function Navbar() {
           <Link to="/profile" className="hover:text-blue-400 text-sm">Profile</Link>
            <ToastContainer
         position="top-right"
-        autoClose={1000}
+        autoClose={2000}
         hideProgressBar={false}
         newestOnTop
         closeOnClick

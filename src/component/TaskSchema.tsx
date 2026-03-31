@@ -9,7 +9,8 @@ export const taskSchema = z.object({
     .string()
     .max(500, "Description too long!")       // optional limit
     .optional(),
-  status: z.enum(["pending", "in_progress", "completed"], {
-    errorMap: () => ({ message: "Invalid status!" }), // only allow these values
+  // Backend: oneof pending | in_progress | done
+  status: z.enum(["pending", "in_progress", "done"], {
+    message: "Invalid status!",
   }),
 })

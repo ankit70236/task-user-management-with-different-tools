@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { z } from "zod";
 import { showToast } from "../component/toast";
 
 import { Button } from "@/components/ui/button";
@@ -14,34 +15,82 @@ import {
 
 import { taskSchema } from "@/component/TaskSchema";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { apiFetch } from "../utils/api";
+import {
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+} from "../features/task/taskApi";
+
+type TaskPayload = z.infer<typeof taskSchema>;
+
+function initialStatus(
+  s: string | undefined
+): "pending" | "in_progress" | "done" {
+  if (s === "in_progress" || s === "done") return s;
+  if (s === "completed") return "done";
+  return "pending";
+}
+
+type TaskFormProps = {
+  editTask: {
+    id: string;
+    title: string;
+    description?: string;
+    status?: string;
+  } | null;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  setEditTask: (task: TaskFormProps["editTask"]) => void;
+};
 
 const TaskForm = ({
-  fetchTasks,
   editTask,
   open,
   setOpen,
   setEditTask,
-}: any) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("pending");
+}: TaskFormProps) => {
+  const [title, setTitle] = useState(() => editTask?.title ?? "");
+  const [description, setDescription] = useState(
+    () => editTask?.description ?? ""
+  );
+  const [status, setStatus] = useState(() => initialStatus(editTask?.status));
 
   const userId = localStorage.getItem("userId");
   const token = localStorage.getItem("token");
 
-  // Populate form when editing
-  useEffect(() => {
-    if (editTask) {
-      setTitle(editTask.title);
-      setDescription(editTask.description);
-      setStatus(editTask.status || "pending");
-    } else {
-      setTitle("");
-      setDescription("");
-      setStatus("pending");
+  const [createTask] = useCreateTaskMutation();
+  const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<TaskPayload | null>(
+    null
+  );
+
+  const resetFormAndClose = () => {
+    setOpen(false);
+    setEditTask(null);
+    setTitle("");
+    setDescription("");
+    setStatus("pending");
+    setShowUpdateConfirm(false);
+    setPendingUpdate(null);
+  };
+
+  const executeUpdate = async () => {
+    if (!editTask || !pendingUpdate) return;
+    try {
+      await updateTask({
+        id: editTask.id,
+        ...pendingUpdate,
+      }).unwrap();
+      showToast("Task updated successfully!", "success");
+      resetFormAndClose();
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
+      showToast(
+        e?.data?.message || e?.message || "Something went wrong!",
+        "error"
+      );
     }
-  }, [editTask]);
+  };
 
   const saveTask = async () => {
     if (!token || !userId) {
@@ -49,7 +98,6 @@ const TaskForm = ({
       return;
     }
 
-    // Zod validation
     const result = taskSchema.safeParse({ title, description, status });
 
     if (!result.success) {
@@ -67,102 +115,132 @@ const TaskForm = ({
 
     const validData = result.data;
 
+    if (editTask) {
+      setPendingUpdate(validData);
+      setShowUpdateConfirm(true);
+      return;
+    }
+
     try {
-      if (editTask) {
-        await apiFetch(`/tasks/${editTask.id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(validData),
-        });
+      await createTask({
+        userId,
+        ...validData,
+      }).unwrap();
 
-        showToast("Task updated successfully!", "success");
-      } else {
-        await apiFetch(`/users/${userId}/tasks`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(validData),
-        });
-
-        showToast("Task created successfully!", "success");
-      }
-
-      // Refresh + reset
-      fetchTasks();
-      setOpen(false);
-      setEditTask(null);
-      setTitle("");
-      setDescription("");
-      setStatus("pending");
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.message || "Something went wrong!", "error");
+      showToast("Task created successfully!", "success");
+      resetFormAndClose();
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
+      showToast(
+        e?.data?.message || e?.message || "Something went wrong!",
+        "error"
+      );
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setEditTask(null);
+          setShowUpdateConfirm(false);
+          setPendingUpdate(null);
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-md p-6 space-y-4 bg-white rounded-xl shadow-md">
-        <DialogTitle>
-          <VisuallyHidden>
-            {editTask ? "Update Task" : "Create Task"}
-          </VisuallyHidden>
-        </DialogTitle>
+        {editTask && showUpdateConfirm ? (
+          <>
+            <DialogTitle>
+              <VisuallyHidden>Confirm update task</VisuallyHidden>
+            </DialogTitle>
+            <h3 className="text-xl font-semibold">Are you sure?</h3>
+            <DialogDescription>
+              Save changes to &ldquo;{editTask.title}&rdquo;? This will update
+              the task on the server.
+            </DialogDescription>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowUpdateConfirm(false);
+                  setPendingUpdate(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-green-600 hover:bg-green-700"
+                disabled={isUpdating}
+                onClick={() => void executeUpdate()}
+              >
+                {isUpdating ? "Saving…" : "OK"}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogTitle>
+              <VisuallyHidden>
+                {editTask ? "Update Task" : "Create Task"}
+              </VisuallyHidden>
+            </DialogTitle>
 
-        <h3 className="text-xl font-semibold">
-          {editTask ? "Update Task" : "Create Task"}
-        </h3>
+            <h3 className="text-xl font-semibold">
+              {editTask ? "Update Task" : "Create Task"}
+            </h3>
 
-        <DialogDescription>
-          Fill out the task details below
-        </DialogDescription>
+            <DialogDescription>
+              Fill out the task details below
+            </DialogDescription>
 
-        {/* Title */}
-        <div className="space-y-1">
-          <Label>Title</Label>
-          <Input
-            value={title}
-            placeholder="Enter title"
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
+            <div className="space-y-1">
+              <Label>Title</Label>
+              <Input
+                value={title}
+                placeholder="Enter title"
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
 
-        {/* Description */}
-        <div className="space-y-1">
-          <Label>Description</Label>
-          <Textarea
-            value={description}
-            placeholder="Enter description"
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Textarea
+                value={description}
+                placeholder="Enter description"
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
 
-        {/* Status */}
-        <div className="space-y-1">
-          <Label>Status</Label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-full border rounded-md p-2"
-          >
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <select
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as "pending" | "in_progress" | "done"
+                  )
+                }
+                className="w-full border rounded-md p-2"
+              >
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Completed</option>
+              </select>
+            </div>
 
-        {/* Submit */}
-        <Button
-          onClick={saveTask}
-          className="w-full bg-green-600 hover:bg-green-700"
-        >
-          {editTask ? "Update Task" : "Create Task"}
-        </Button>
+            <Button
+              onClick={() => void saveTask()}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {editTask ? "Update Task" : "Create Task"}
+            </Button>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

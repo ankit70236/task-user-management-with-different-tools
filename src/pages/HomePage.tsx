@@ -3,43 +3,39 @@ import TaskForm from "./taskForm";
 import TaskItem from "../component/TaskItem";
 import { showToast } from "../component/toast";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "../utils/api";
+import { useGetUserTasksQuery } from "../features/task/taskApi";
+
+type TaskRow = {
+  id: string;
+  title: string;
+  description?: string;
+  status?: string;
+};
 
 export default function HomePage() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [editTask, setEditTask] = useState<any>(null);
+  const [editTask, setEditTask] = useState<TaskRow | null>(null);
   const [showForm, setShowForm] = useState(false);
+  /** Bumps on each "Create Task" open so TaskForm remounts with empty fields (no effect-based reset). */
+  const [createFormKey, setCreateFormKey] = useState(0);
 
   const userId = localStorage.getItem("userId");
   const token = localStorage.getItem("token");
 
-  // ✅ FIXED FUNCTION
-  const fetchTasks = async () => {
-    if (!userId || !token) {
-      showToast("User not logged in!", "error");
-      return;
-    }
+  const { data, isError, error } = useGetUserTasksQuery(userId!, {
+    skip: !userId || !token,
+  });
+  const tasks: TaskRow[] = Array.isArray(data) ? (data as TaskRow[]) : [];
 
-    try {
-      const data = await apiFetch(`/users/${userId}/tasks`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setTasks(data.data ?? []);
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.message || "Failed to load tasks", "error");
-      setTasks([]);
-    }
-  };
-
-  // ✅ NOW OUTSIDE FUNCTION
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (isError && error && "data" in error) {
+      const data = error.data as { message?: string } | undefined;
+      showToast(data?.message || "Failed to load tasks", "error");
+    }
+  }, [isError, error]);
 
   const openCreateForm = () => {
     setEditTask(null);
+    setCreateFormKey((k) => k + 1);
     setShowForm(true);
   };
 
@@ -58,7 +54,7 @@ export default function HomePage() {
 
       {showForm && (
         <TaskForm
-          fetchTasks={fetchTasks}
+          key={editTask?.id ?? `new-${createFormKey}`}
           editTask={editTask}
           open={showForm}
           setOpen={setShowForm}
@@ -74,7 +70,6 @@ export default function HomePage() {
             <TaskItem
               key={task.id}
               task={task}
-              fetchTasks={fetchTasks}
               setEditTask={setEditTask}
               setShowForm={setShowForm}
             />

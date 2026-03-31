@@ -8,16 +8,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { apiFetch } from "@/utils/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useGetUsersQuery,
+  useDeleteUserMutation,
+} from "../features/user/userApi";
 
-type User = {
+type UserRow = {
   id: string;
-  email: string;
-  name: string;
+  name?: string;
+  email?: string;
 };
 
 export default function ListUser() {
-  const [users, setUsers] = useState<User[]>([]);
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
 
@@ -32,51 +42,58 @@ export default function ListUser() {
   const loggedUser = token ? parseJwt(token) : null;
   const loggedUserId = loggedUser?.sub;
 
+  const { data, isError, error } = useGetUsersQuery(undefined, {
+    skip: !token,
+  });
+  const users: UserRow[] = Array.isArray(data) ? (data as UserRow[]) : [];
+
+  const [deleteUserMutation, { isLoading: isDeleting }] =
+    useDeleteUserMutation();
+  const [userPendingDelete, setUserPendingDelete] = useState<UserRow | null>(
+    null
+  );
+  const [userPendingUpdate, setUserPendingUpdate] = useState<UserRow | null>(
+    null
+  );
+
   useEffect(() => {
-    async function getUsers() {
-      try {
-        const data = await apiFetch("/users", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const usersData = Array.isArray(data)
-          ? data
-          : data?.data || [];
-
-        setUsers(usersData);
-      } catch (err: any) {
-        showToast(err.message || "Failed to load users", "error");
-      }
-    }
-
     if (!token) {
       navigate("/login");
-      return;
     }
-
-    getUsers();
   }, [token, navigate]);
 
-  const deleteUser = async (id: string) => {
+  useEffect(() => {
+    if (isError && error && "data" in error) {
+      const data = error.data as { message?: string } | undefined;
+      showToast(data?.message || "Failed to load users", "error");
+    }
+  }, [isError, error]);
+
+  const requestDeleteUser = (user: UserRow) => {
+    if (user.id !== loggedUserId) {
+      showToast("You can delete only your account!", "error");
+      return;
+    }
+    setUserPendingDelete(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userPendingDelete) return;
+    const id = userPendingDelete.id;
     try {
-      await apiFetch(`/users/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await deleteUserMutation(id).unwrap();
       showToast("User deleted!", "success");
-
+      setUserPendingDelete(null);
       if (id === loggedUserId) {
         localStorage.removeItem("token");
         navigate("/register");
       }
-    } catch (err: any) {
-      showToast(err.message || "Delete failed!", "error");
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
+      showToast(
+        e?.data?.message || e?.message || "Delete failed!",
+        "error"
+      );
     }
   };
 
@@ -101,7 +118,7 @@ export default function ListUser() {
                       showToast("You can update only your account!", "error");
                       return;
                     }
-                    navigate(`/updateuser/${user.id}`);
+                    setUserPendingUpdate(user);
                   }}
                 >
                   Update
@@ -109,13 +126,7 @@ export default function ListUser() {
 
                 <Button
                   variant="destructive"
-                  onClick={() => {
-                    if (user.id !== loggedUserId) {
-                      showToast("You can delete only your account!", "error");
-                      return;
-                    }
-                    deleteUser(user.id);
-                  }}
+                  onClick={() => requestDeleteUser(user)}
                 >
                   Delete
                 </Button>
@@ -124,6 +135,87 @@ export default function ListUser() {
           </Card>
         ))}
       </div>
+
+      <Dialog
+        open={userPendingUpdate !== null}
+        onOpenChange={(open) => {
+          if (!open) setUserPendingUpdate(null);
+        }}
+      >
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogDescription>
+              Open the edit page to update your profile
+              {userPendingUpdate?.name
+                ? ` (${userPendingUpdate.name})`
+                : ""}
+              ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUserPendingUpdate(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!userPendingUpdate) return;
+                navigate(`/updateuser/${userPendingUpdate.id}`, {
+                  state: {
+                    name: userPendingUpdate.name,
+                    email: userPendingUpdate.email,
+                  },
+                });
+                setUserPendingUpdate(null);
+              }}
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={userPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setUserPendingDelete(null);
+        }}
+      >
+        <DialogContent showCloseButton className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete your account
+              {userPendingDelete?.name
+                ? ` (${userPendingDelete.name})`
+                : ""}
+              . This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUserPendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => void confirmDeleteUser()}
+            >
+              {isDeleting ? "Deleting…" : "OK"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
